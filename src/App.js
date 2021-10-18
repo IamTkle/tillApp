@@ -223,6 +223,33 @@ function App() {
     setSnackbarOpen(false);
   };
 
+  const handleQRSend = async () => {
+    setLoadProgress(33);
+    const resp = await fetch(DOMAIN + "/api/QRProducts", {
+      method: "POST",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: objStr,
+    }).catch((e) => console.error(e));
+
+    if (resp && resp.ok) {
+      setAlertSeverity("success");
+      setSnackbarMsg("Added items successfully!");
+      setSnackbarOpen(true);
+    } else if (resp && resp.status === 401) {
+      setAlertSeverity("error");
+      setSnackbarMsg("Not authorized to add items!");
+      setSnackbarOpen(true);
+    } else {
+      setAlertSeverity("error");
+      setSnackbarMsg("Could not add items!");
+      setSnackbarOpen(true);
+    }
+    setLoadProgress(100);
+  };
+
   return (
     <div className="App">
       <AppBar>
@@ -340,7 +367,12 @@ function App() {
             maxRows={25}
             minRows={25}
           />
-          <Button color="secondary" variant="contained" fullWidth>
+          <Button
+            color="secondary"
+            variant="contained"
+            fullWidth
+            onClick={handleQRSend}
+          >
             Send
           </Button>
         </Grid>
