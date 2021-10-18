@@ -370,6 +370,7 @@ function App() {
           <Button
             color="secondary"
             variant="contained"
+            disabled={!loggedIn}
             fullWidth
             onClick={handleQRSend}
           >
