@@ -4,6 +4,7 @@ import {
   Button,
   CircularProgress,
   Container,
+  Dialog,
   Divider,
   Grid,
   LinearProgress,
@@ -26,21 +27,21 @@ const useStyles = makeStyles({
   },
 });
 
-const initializeRows = () => {
-  let rowArray = [];
+// const initializeRows = () => {
+//   let rowArray = [];
 
-  for (let i = 0; i < 1000; i++) {
-    rowArray.push({
-      id: i,
-      productID: i,
-      pname: "Cum sock type " + i,
-      exp: new Date(),
-      count: 1,
-    });
-  }
+//   for (let i = 0; i < 1000; i++) {
+//     rowArray.push({
+//       id: i,
+//       productID: i,
+//       pname: "Cum sock type " + i,
+//       exp: new Date(),
+//       count: 1,
+//     });
+//   }
 
-  return rowArray;
-};
+//   return rowArray;
+// };
 
 const DOMAIN = "https://pantties.azurewebsites.net";
 
@@ -49,28 +50,11 @@ function App() {
 
   const [scanning, setScanning] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
-  const [rows, setRows] = useState(() => initializeRows());
+  const [rows, setRows] = useState([]);
 
-  const [columns] = useState([
-    { field: "productID", headerName: "Product ID", width: 100 },
-    { field: "pname", headerName: "Product Name", width: 200 },
-    {
-      field: "exp",
-      headerName: "Expiry Date",
-      width: 200,
-      type: "date",
-      editable: true,
-    },
-    {
-      field: "count",
-      headerName: "Count",
-      width: 100,
-      editable: true,
-      type: "number",
-    },
-  ]);
+  const [columns, setColumns] = useState([]);
 
-  const [jsonObj, setJsonObj] = useState({ uid: "", items: [] });
+  const [jsonObj, setJsonObj] = useState({ items: [], accountId: "" });
 
   const [objStr, setObjStr] = useState(JSON.stringify(jsonObj, null, 10));
 
@@ -80,9 +64,7 @@ function App() {
 
   const [password, setPassword] = useState("");
 
-  const [loggedIn, setLoggedIn] = useState(() =>
-    document.cookie.includes("LoggedIn")
-  );
+  const [loggedIn, setLoggedIn] = useState(false);
 
   const [loadProgress, setLoadProgress] = useState(0);
 
@@ -106,7 +88,12 @@ function App() {
         ...prev,
         items: selectionModel.map((index) => {
           const obj = rows[index];
-          return { productID: obj.productID, exp: obj.exp, count: obj.count };
+          return {
+            productID: obj.itemId,
+            exp: obj.exp,
+            count: obj.count,
+            NotificationTime: obj.NotificationTime,
+          };
         }),
       };
     });
@@ -121,14 +108,14 @@ function App() {
       // console.log(model, rowIndex);
       setRows((prev) => {
         let newRows = [...prev];
-        let oldRow = prev[rowIndex];
-        let newRow = {
-          id: oldRow.id,
-          productID: oldRow.productID,
-          pname: oldRow.pname,
-          count: oldRow.count,
-          exp: oldRow.exp,
-        };
+        let newRow = { ...prev[rowIndex] };
+        // let newRow = {
+        //   id: oldRow.id,
+        //   productID: oldRow.productID,
+        //   pname: oldRow.pname,
+        //   count: oldRow.count,
+        //   exp: oldRow.exp,
+        // };
 
         console.log(newRow.count, newRow.exp);
         if (newRow.count !== undefined && model[rowIndex].count) {
@@ -142,6 +129,84 @@ function App() {
       });
     }
   }, [editRowsModel]);
+
+  const checkLoggedIn = () => {
+    fetch(DOMAIN + "/api/isLoggedIn", {
+      method: "GET",
+      credentials: "include",
+    })
+      .then((resp) => resp.json())
+      .then((data) => {
+        if (data.isLoggedIn) {
+          setLoggedIn(true);
+
+          setSnackbarOpen(true);
+          setSnackbarMsg("Welcome back!");
+          setAlertSeverity("success");
+        }
+      })
+      .catch((e) => console.error(e));
+  };
+
+  useEffect(() => {
+    checkLoggedIn();
+
+    fetch(DOMAIN + "/api/getShoppingProducts", {
+      method: "GET",
+      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+      },
+    })
+      .then((resp) => resp.json())
+      .then((data) => {
+        console.log(data[0]);
+        setColumns(() => {
+          let fields = Object.keys(data[0]).map((key, i) => {
+            if (typeof data[0][key] === "object") return {};
+            return {
+              field: key,
+              headerName: key,
+              width: 200,
+            };
+          });
+          fields.push({
+            field: "exp",
+            headerName: "Expiry Date",
+            width: 100,
+            editable: true,
+            type: "date",
+          });
+          fields.push({
+            field: "count",
+            headerName: "Count",
+            width: 100,
+            editable: true,
+            type: "number",
+          });
+          fields.push({
+            field: "NotificationTime",
+            headerName: "NotificationTime",
+            width: 100,
+            type: "date",
+          });
+          return fields;
+        });
+
+        setRows(
+          data.map((item, i) => {
+            return {
+              ...item,
+              id: i,
+              exp: new Date().toISOString(),
+              count: 1,
+              NotificationTime: new Date().toISOString(),
+            };
+          })
+        );
+      })
+      .catch((e) => console.error(e));
+  }, []);
 
   const handleModelSelectionChange = (model) => {
     setSelectionModel(model);
@@ -231,7 +296,7 @@ function App() {
       headers: {
         "Content-Type": "application/json",
       },
-      body: objStr,
+      body: JSON.stringify(jsonObj),
     }).catch((e) => console.error(e));
 
     if (resp && resp.ok) {
@@ -312,7 +377,7 @@ function App() {
       </AppBar>
       <Toolbar />
       <Grid container spacing={1} minHeight="32rem">
-        <Grid item xs={6} minHeight="40rem">
+        <Grid item xs={12} minHeight="40rem">
           <DataGrid
             rows={rows}
             columns={columns}
@@ -328,35 +393,7 @@ function App() {
           />
         </Grid>
         <Divider />
-        {scanning && (
-          <Grid item xs={5}>
-            <Container maxWidth="xs" className={classes.parentContainer}>
-              <Typography variant="h6">{errorMessage}</Typography>
-              <QrReader
-                delay={1000}
-                style={{ width: "100%", aspectRatio: "1 / 1" }}
-                onScan={(data) => {
-                  console.log(data);
-                  if (data) {
-                    setScanning(false);
-                    setErrorMessage(data);
-                    setJsonObj((prev) => {
-                      return { ...prev, uid: data };
-                    });
-                    return;
-                  }
-                  setErrorMessage(
-                    "Please place your QR code in front of the camera"
-                  );
-                }}
-                onError={(error) => {
-                  console.error(error);
-                }}
-              />
-            </Container>
-          </Grid>
-        )}
-        <Grid item xs={scanning ? 12 : 5}>
+        <Grid item xs={12}>
           <TextField
             label="JSON object preview"
             autoCorrect={false}
@@ -378,6 +415,41 @@ function App() {
           </Button>
         </Grid>
       </Grid>
+
+      <Dialog
+        open={scanning}
+        onClose={() => {
+          setScanning(false);
+        }}
+      >
+        <Container maxWidth="xs" className={classes.parentContainer}>
+          <Typography variant="h6">{errorMessage}</Typography>
+          <QrReader
+            delay={1000}
+            style={{
+              width: "100%",
+              aspectRatio: "1 / 1",
+            }}
+            onScan={(data) => {
+              console.log(data);
+              if (data) {
+                setScanning(false);
+                setErrorMessage(data);
+                setJsonObj((prev) => {
+                  return { ...prev, accountId: data };
+                });
+                return;
+              }
+              setErrorMessage(
+                "Please place your QR code in front of the camera"
+              );
+            }}
+            onError={(error) => {
+              console.error(error);
+            }}
+          />
+        </Container>
+      </Dialog>
       <Snackbar
         open={snackbarOpen}
         onClose={handleSnackbarClose}
