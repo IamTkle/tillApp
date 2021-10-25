@@ -25,6 +25,8 @@ jobs:
         run: |
           npm install
           npm install serve
+          mkdir node_modules/@mui/x-data-grid/dist
+          mv node_modules/@mui/x-data-grid/* node_modules/@mui/x-data-grid/dist
           CI=false npm run build 
           
       - name: Zip artifact for deployment
